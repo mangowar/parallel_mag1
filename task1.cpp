@@ -13,9 +13,48 @@ double dot(vector<double>& a, vector<double>& b);
 void InverseMatrix(int N, vector<double>& A, vector<int>& Ja, vector<int>& Ia, vector<double>& M_inv, vector<int>& Ia_inv, vector<int>& Ja_inv);
 void SpMV(int N, vector<double>& A, vector<int>& Ja, vector<int>& Ia, vector<double>& b, vector<double>& res);
 void parallel_copy(vector<double>& source,  vector<double>& dest);
+void SpMV_seq(int N,  vector<double>& A,  vector<int>& Ja,  vector<int>& Ia, vector<double>& b, vector<double>& res);
+void vec_axpy(double a, vector<double>& x, vector<double>& y, vector<double>& res);
+double vec_dot(vector<double>& a, vector<double>& b);
 
 bool print = false;
 double InverseMatrix_time, SpMV_time, dot_time, axpy_time, parallel_copy_time, iteration_time, gen_time, fill_time, solve_time;
+
+bool is_eq(double a, double b) {
+    return (fabs(a-b) < 0.000001);
+}
+
+void Test_axpy(double a, vector<double>& x, vector<double>& y) {
+    cout << "Test axpy: ";
+    vector<double> r1(x.size()), r2(x.size());
+    axpy(a, x, y, r1);
+    vec_axpy(a, x, y, r2);
+    if (is_eq(dot(r1, r1), dot(r2, r2)))
+        cout << "OK" << endl;
+    else
+        cout << "WA" << endl;
+}
+
+void Test_dot(vector<double>& a, vector<double>& b) {
+    cout << "Test dot: ";
+    double r1 = dot(a, b);
+    double r2 = vec_dot(a, b);
+    if(is_eq(r1, r2))
+        cout << "OK" << endl;
+    else
+        cout << "WA" << endl;
+}
+
+void Test_SpMV(int N, vector<double>& A, vector<int>& Ja, vector<int>& Ia, vector<double>& b) {
+    cout << "Test SpMV: ";
+    vector<double> r1(b.size()), r2(b.size());
+    SpMV(N, A, Ja, Ia, b, r1);
+    SpMV_seq(N, A, Ja, Ia, b, r2);
+    if (is_eq(dot(r1, r1), dot(r2, r2))) 
+        cout << "OK" << endl;
+    else
+        cout << "WA" << endl;
+}
 
 int Generate(vector<int>& Ia, vector<int>& Ja, int nx, int ny, int k1, int k2) {
     Ja.resize((nx+1)*(ny+1)*7);
@@ -224,6 +263,22 @@ void SpMV(int N,  vector<double>& A,  vector<int>& Ja,  vector<int>& Ia, vector<
     //     cout << "SpMV time: " << omp_get_wtime()-t1 << endl; 
 }
 
+void SpMV_seq(int N,  vector<double>& A,  vector<int>& Ja,  vector<int>& Ia, vector<double>& b, vector<double>& res) {
+    // res.resize(N);
+    for(double& i: res)
+        i = 0;
+    // double t1 = omp_get_wtime();
+    for(int i = 0; i < N; i++) {
+        double sum = 0;
+        for(int col = Ia[i]; col < Ia[i+1] && col; col++) {
+            sum += A[col]*b[Ja[col]];
+        }
+        res[i] = sum;
+    }
+    // if(print)
+    //     cout << "SpMV time: " << omp_get_wtime()-t1 << endl; 
+}
+
 double dot(vector<double>& a, vector<double>& b) {
     double res = 0.0;
     int n = a.size();
@@ -329,6 +384,9 @@ int main(int argc, char* argv[]) {
 
 
     if(print) {
+        Test_axpy(-2, b, b);
+        Test_dot(b, b);
+        Test_SpMV(N, A, Ja, Ia, b);
         size_t n = Ia.size();
         size_t k = Ja.size();
         cout << "  Ia:" << endl;
