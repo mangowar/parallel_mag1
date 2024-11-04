@@ -89,7 +89,6 @@ int Generate(vector<int>& Ia, vector<int>& Ja, int nx, int ny, int k1, int k2) {
     }
 
     double t2 = omp_get_wtime();
-    // cout << "Generate time: " << t2 - t1 << endl;
     gen_time = t2-t1;
     
     /*compress Ja*/
@@ -148,7 +147,6 @@ void Fill(vector<double>& A, vector<double>& b, vector<int>& Ia, vector<int>& Ja
         
     }
     fill_time =  omp_get_wtime()-t1;
-    // cout << "Fill time: " << fill_time << endl;
     
 }
 
@@ -225,7 +223,6 @@ double Solve(int N, vector<double>& A,  vector<int>& Ja,  vector<int>& Ia,  vect
     res = move(x);
     t2 = omp_get_wtime();
     solve_time = t2-t1;
-    // cout << "Solve time: " << t2-t1 << endl; 
     return sqrt(dot(residual, residual));
 }
 
@@ -247,10 +244,8 @@ void InverseMatrix(int N, vector<double>& A,  vector<int>& Ja,  vector<int>& Ia,
 }
 
 void SpMV(int N,  vector<double>& A,  vector<int>& Ja,  vector<int>& Ia, vector<double>& b, vector<double>& res) {
-    // res.resize(N);
     for(double& i: res)
         i = 0;
-    // double t1 = omp_get_wtime();
     #pragma omp parallel for default(shared)
     for(int i = 0; i < N; i++) {
         double sum = 0;
@@ -259,15 +254,11 @@ void SpMV(int N,  vector<double>& A,  vector<int>& Ja,  vector<int>& Ia, vector<
         }
         res[i] = sum;
     }
-    // if(print)
-    //     cout << "SpMV time: " << omp_get_wtime()-t1 << endl; 
 }
 
 void SpMV_seq(int N,  vector<double>& A,  vector<int>& Ja,  vector<int>& Ia, vector<double>& b, vector<double>& res) {
-    // res.resize(N);
     for(double& i: res)
         i = 0;
-    // double t1 = omp_get_wtime();
     for(int i = 0; i < N; i++) {
         double sum = 0;
         for(int col = Ia[i]; col < Ia[i+1] && col; col++) {
@@ -275,8 +266,6 @@ void SpMV_seq(int N,  vector<double>& A,  vector<int>& Ja,  vector<int>& Ia, vec
         }
         res[i] = sum;
     }
-    // if(print)
-    //     cout << "SpMV time: " << omp_get_wtime()-t1 << endl; 
 }
 
 double dot(vector<double>& a, vector<double>& b) {
@@ -287,21 +276,16 @@ double dot(vector<double>& a, vector<double>& b) {
     for(int i = 0; i < n; i++) {
         res += a[i]*b[i];
     }
-    // if(print)
-    //     cout << "dot time: " << omp_get_wtime()-t1 << endl; 
     return res;
 }
 
 void axpy(double a,  vector<double>& x,  vector<double>& y, vector<double>& res) {
-    // res.resize(x.size());
     int n = x.size();
     double t1 = omp_get_wtime();
     #pragma omp parallel for
     for(int i = 0; i < n; i++) {
         res[i] = a*x[i]+y[i];
     }
-    // if(print)
-    //     cout << "axpy time: " << omp_get_wtime()-t1 << endl; 
 }
 
 void parallel_copy(vector<double>& source,  vector<double>& dest) {
@@ -323,7 +307,6 @@ double vec_dot(vector<double>& a, vector<double>& b) {
 }
 
 void vec_axpy(double a, vector<double>& x, vector<double>& y, vector<double>& res) {
-    // res.resize(x.size());
     int n = x.size();
     #pragma unroll 10
     for(int i = 0; i < n; i++) {
