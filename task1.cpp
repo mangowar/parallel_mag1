@@ -15,7 +15,7 @@ void SpMV(int N, vector<double>& A, vector<int>& Ja, vector<int>& Ia, vector<dou
 void parallel_copy(vector<double>& source,  vector<double>& dest);
 
 bool print = false;
-double InverseMatrix_time, SpMV_time, dot_time, axpy_time, parallel_copy_time, iteration_time;
+double InverseMatrix_time, SpMV_time, dot_time, axpy_time, parallel_copy_time, iteration_time, gen_time, fill_time, solve_time;
 
 int Generate(vector<int>& Ia, vector<int>& Ja, int nx, int ny, int k1, int k2) {
     Ja.resize((nx+1)*(ny+1)*7);
@@ -50,7 +50,8 @@ int Generate(vector<int>& Ia, vector<int>& Ja, int nx, int ny, int k1, int k2) {
     }
 
     double t2 = omp_get_wtime();
-    cout << "Generate time: " << t2 - t1 << endl;
+    // cout << "Generate time: " << t2 - t1 << endl;
+    gen_time = t2-t1;
     
     /*compress Ja*/
     size_t l = 0;
@@ -101,12 +102,15 @@ void Fill(vector<double>& A, vector<double>& b, vector<int>& Ia, vector<int>& Ja
         b[i] = sin(i);
         diag *= 1.5;
         for(int col = Ia[i]; col < Ia[i+1]; col++) {
-            if(i == Ja[col])
+            if(i == Ja[col]) {
                 A[col] = diag;
+            }
         }
         
     }
-    cout << "Fill time: " << omp_get_wtime()-t1 << endl;
+    fill_time =  omp_get_wtime()-t1;
+    // cout << "Fill time: " << fill_time << endl;
+    
 }
 
 double Solve(int N, vector<double>& A,  vector<int>& Ja,  vector<int>& Ia,  vector<double>& b, vector<double>& res, double eps, int maxit) {
@@ -181,7 +185,8 @@ double Solve(int N, vector<double>& A,  vector<int>& Ja,  vector<int>& Ia,  vect
     axpy(-1, b, ax, residual);
     res = move(x);
     t2 = omp_get_wtime();
-    cout << "Solve time: " << t2-t1 << endl; 
+    solve_time = t2-t1;
+    // cout << "Solve time: " << t2-t1 << endl; 
     return sqrt(dot(residual, residual));
 }
 
@@ -312,29 +317,35 @@ int main(int argc, char* argv[]) {
     Fill(A, b, Ia, Ja, N);
     Solve(N, A, Ja, Ia, b, res, 0.001, 1000);
 
+    cout << "Generation time: " << gen_time << endl;
+    cout << "Fill time: " << fill_time << endl;
+    cout << "Solve time: " << solve_time << endl; 
     cout << "Iteration time: " << iteration_time << endl;
     cout << "dot time: " << dot_time << endl;
     cout << "InverseMatrix time: " << InverseMatrix_time << endl;
     cout << "SpMV time: " << SpMV_time << endl;
     cout << "axpy time: " << axpy_time << endl;
     cout << "parallel_copy time: " << parallel_copy_time << endl;
-    // InverseMatrix(N, A, Ja, Ia, M, Ia_inv, Ja_Inv);
-    // SpMV(N, A, Ja, Ia, b, cur_res);
 
 
-    // if(print) {
-        // size_t n = Ia.size();
-        // size_t k = Ja.size();
-        // cout << "  Ia:" << endl;
-        // for(int i = 0; i < n; i++) {
-        //     cout << Ia[i] << ' ';
-        // }
-        // cout << endl;
-        // cout << "  Ja:" << endl;
-        // for(int i = 0; i < k; i++) {
-        //     cout << Ja[i] << ' ';
-        // }
-        // cout << endl;
-    // }
+    if(print) {
+        size_t n = Ia.size();
+        size_t k = Ja.size();
+        cout << "  Ia:" << endl;
+        for(int i = 0; i < n; i++) {
+            cout << Ia[i] << ' ';
+        }
+        cout << endl;
+        cout << "  Ja:" << endl;
+        for(int i = 0; i < k; i++) {
+            cout << Ja[i] << ' ';
+        }
+        cout << endl;
+        cout << "  A:" << endl;
+        for(int i = 0; i < A.size(); i++) {
+            cout << A[i] << ' ';
+        }
+        cout << endl;
+    }
     return 0;
 }
