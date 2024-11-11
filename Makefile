@@ -3,7 +3,7 @@ BIN_NAME=solver
 SRC_FILES=task1.cpp
 
 CXX=g++
-CXX_FLAGS = --std=c++11 -O3 -fopenmp
+CXX_FLAGS = --std=c++11 -fopenmp
 
 build:
 	$(CXX) $(CXX_FLAGS) $(SRC_FILES) -o $(BIN_NAME)

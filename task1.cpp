@@ -20,6 +20,9 @@ double vec_dot(vector<double>& a, vector<double>& b);
 bool print = false;
 double InverseMatrix_time, SpMV_time, dot_time, axpy_time, parallel_copy_time, iteration_time, gen_time, fill_time, solve_time;
 
+long long count_ops = 0;
+
+
 bool is_eq(double a, double b) {
     return (fabs(a-b) < 0.000001);
 }
@@ -128,17 +131,20 @@ int Generate(vector<int>& Ia, vector<int>& Ja, int nx, int ny, int k1, int k2) {
 
 void Fill(vector<double>& A, vector<double>& b, vector<int>& Ia, vector<int>& Ja, int N) {
     double t1 = omp_get_wtime();
-    #pragma omp parallel for
+    #pragma omp parallel for reduction(+:count_ops)
     for(int i = 0; i < N; i++) {
         double diag = 0;
         for(int col = Ia[i]; col < Ia[i+1]; col++) {
             if(i != Ja[col]) {
                 A[col] = cos(i*Ja[col]+i+Ja[col]);
                 diag += (A[col] >= 0) ? (A[col]) : -(A[col]);
+                count_ops++;
             }
         }
         b[i] = sin(i);
+        count_ops++;
         diag *= 1.5;
+        count_ops++;
         for(int col = Ia[i]; col < Ia[i+1]; col++) {
             if(i == Ja[col]) {
                 A[col] = diag;
@@ -165,42 +171,23 @@ double Solve(int N, vector<double>& A,  vector<int>& Ja,  vector<int>& Ia,  vect
             cout << "Step " << k << endl;
         SpMV(N, M_inv, Ja_inv, Ia_inv, r, z);
         ro_prev = ro;
-        t1_func =  omp_get_wtime();
         ro = dot(r, z);
-        t2_func =  omp_get_wtime();
         /*Addition to mesuare time*/
-        if(k == 1)
-            dot_time = t2_func-t1_func;
         if(k == 1) {
-            // p = z;
+            
             parallel_copy(z, p);
         }
         else {
             beta = ro/ro_prev;
-            /* 𝒑𝑘 = 𝒛𝑘 + 𝛽𝑘 𝒑𝑘−1*/
-            // p_prev = p;
+            /* 𝒑𝑘 = 𝒛𝑘 + 𝛽𝑘 𝒑𝑘−1*/   
             parallel_copy(p, p_prev);
             axpy(beta, p_prev, z, p);
         }
-        t1_func =  omp_get_wtime();
         SpMV(N, A, Ja, Ia, p, q);
-        t2_func =  omp_get_wtime();
-        if(k == 1)
-            SpMV_time = t2_func-t1_func;
         double alpha = ro/dot(p, q);
-        // x_prev = x;
-        t1_func =  omp_get_wtime();
         parallel_copy(x, x_prev);
-        t2_func =  omp_get_wtime();
-        if(k == 1)
-            parallel_copy_time = t2_func-t1_func;
         /*𝒙𝑘 = 𝒙𝑘−1 + 𝛼𝑘 𝒑𝑘*/
-        t1_func =  omp_get_wtime();
         axpy(alpha, p, x_prev, x);
-        t2_func =  omp_get_wtime();
-        if(k == 1)
-            axpy_time = t2_func -t1_func;
-        // r_prev = r;
         parallel_copy(r, r_prev);
         /*𝒓𝑘 = 𝒓𝑘−1 − 𝛼𝑘 𝒒𝑘*/
         axpy(-alpha, q, r_prev, r);
@@ -228,13 +215,14 @@ double Solve(int N, vector<double>& A,  vector<int>& Ja,  vector<int>& Ia,  vect
 
 void InverseMatrix(int N, vector<double>& A,  vector<int>& Ja,  vector<int>& Ia, vector<double>& M_inv, vector<int>& Ia_inv, vector<int>& Ja_inv) {
     double t1 = omp_get_wtime(), t2;
-    #pragma omp parallel for default(shared)
+    #pragma omp parallel for default(shared) reduction(+:count_ops)
     for(int i = 0; i < N; i++) {
         for(int col = Ia[i]; col < Ia[i+1]; col++) {
             if(i == Ja[col]) {
                 M_inv[i] = 1/A[col];
                 Ia_inv[i] = i;
                 Ja_inv[i] = i;
+                count_ops++;
             }
         }
     }
@@ -246,11 +234,12 @@ void InverseMatrix(int N, vector<double>& A,  vector<int>& Ja,  vector<int>& Ia,
 void SpMV(int N,  vector<double>& A,  vector<int>& Ja,  vector<int>& Ia, vector<double>& b, vector<double>& res) {
     for(double& i: res)
         i = 0;
-    #pragma omp parallel for default(shared)
+    #pragma omp parallel for default(shared) reduction(+:count_ops)
     for(int i = 0; i < N; i++) {
         double sum = 0;
-        for(int col = Ia[i]; col < Ia[i+1] && col; col++) {
+        for(int col = Ia[i]; col < Ia[i+1]; col++) {
             sum += A[col]*b[Ja[col]];
+            count_ops += 2;
         }
         res[i] = sum;
     }
@@ -261,7 +250,7 @@ void SpMV_seq(int N,  vector<double>& A,  vector<int>& Ja,  vector<int>& Ia, vec
         i = 0;
     for(int i = 0; i < N; i++) {
         double sum = 0;
-        for(int col = Ia[i]; col < Ia[i+1] && col; col++) {
+        for(int col = Ia[i]; col < Ia[i+1]; col++) {
             sum += A[col]*b[Ja[col]];
         }
         res[i] = sum;
@@ -272,9 +261,10 @@ double dot(vector<double>& a, vector<double>& b) {
     double res = 0.0;
     int n = a.size();
     double t1 = omp_get_wtime();
-    #pragma omp parallel for reduction(+:res)
+    #pragma omp parallel for reduction(+:res, count_ops)
     for(int i = 0; i < n; i++) {
         res += a[i]*b[i];
+        count_ops++;
     }
     return res;
 }
@@ -282,9 +272,10 @@ double dot(vector<double>& a, vector<double>& b) {
 void axpy(double a,  vector<double>& x,  vector<double>& y, vector<double>& res) {
     int n = x.size();
     double t1 = omp_get_wtime();
-    #pragma omp parallel for
+    #pragma omp parallel for reduction(+:count_ops)
     for(int i = 0; i < n; i++) {
         res[i] = a*x[i]+y[i];
+        count_ops++;
     }
 }
 
@@ -324,6 +315,67 @@ void Help() {
     cout << "print\t\tPrint resulting matrixes. Optional argument" << endl;
 }
 
+void measure_dot_time(vector<double>& a, vector<double>& b) {
+    double res = 0, t1, t2;
+    for(int i = 0; i < 10; i++) {
+        t1 = omp_get_wtime();
+        dot(a, b);
+        t2 = omp_get_wtime();
+        res += t2-t1;
+    }
+    dot_time = res/10;
+}
+
+void mesuare_axpy_time(double a, vector<double>& x, vector<double>& y) {
+    vector<double> axpy_res(x.size());
+    double t1, t2, res = 0;
+    for(int i = 0; i < 10; i++) {
+        t1 = omp_get_wtime();
+        axpy(a, x, y, axpy_res);
+        t2 = omp_get_wtime();
+        res += t2-t1;
+    }
+    axpy_time = res/10;
+}
+
+void measure_SpMV_time(int N,  vector<double>& A,  vector<int>& Ja,  vector<int>& Ia, vector<double>& b) {
+    vector<double> SpMV_res(b.size());
+    double t1, t2, res = 0;
+    for(int i = 0; i < 10; i++) {
+        t1 = omp_get_wtime();
+        SpMV(N, A, Ja, Ia, b, SpMV_res);
+        t2 = omp_get_wtime();
+        res += t2-t1;
+    }
+    SpMV_time = res/10;
+}
+
+void measure_InverseMatrix_time(int N, vector<double>& A,  vector<int>& Ja,  vector<int>& Ia) {
+    vector<double> M_inv(N);
+    vector<int> Ia_inv(N+1);
+    vector<int> Ja_inv(N);
+    double t1, t2, res = 0;
+    for(int i = 0; i < 10; i++) {
+        t1 = omp_get_wtime();
+        InverseMatrix(N, A, Ja, Ia, M_inv, Ia_inv, Ja_inv);
+        t2 = omp_get_wtime();
+        res += t2-t1;
+    }
+    InverseMatrix_time = res/10;
+}
+
+void measure_copy_time(vector<double>& a) {
+    double t1, t2, res = 0;
+    vector<double> b(a.size());
+    for(int i = 0; i < 10; i++) {
+        t1 = omp_get_wtime();
+        parallel_copy(a, b);
+        t2 = omp_get_wtime();
+        res += t2-t1;
+    }
+    parallel_copy_time = res/10;
+}
+
 int main(int argc, char* argv[]) {
     if(argc == 1) {
         Help();
@@ -355,15 +407,25 @@ int main(int argc, char* argv[]) {
     Fill(A, b, Ia, Ja, N);
     Solve(N, A, Ja, Ia, b, res, 0.001, 1000);
 
+    measure_dot_time(b, b);
+    mesuare_axpy_time(2, b, b);
+    measure_SpMV_time(N, A, Ja, Ia, b);
+    measure_copy_time(b);
+
     cout << "Generation time: " << gen_time << endl;
     cout << "Fill time: " << fill_time << endl;
     cout << "Solve time: " << solve_time << endl; 
     cout << "Iteration time: " << iteration_time << endl;
+
+    
     cout << "dot time: " << dot_time << endl;
     cout << "InverseMatrix time: " << InverseMatrix_time << endl;
     cout << "SpMV time: " << SpMV_time << endl;
     cout << "axpy time: " << axpy_time << endl;
     cout << "parallel_copy time: " << parallel_copy_time << endl;
+
+    cout << "amount of operations: " << count_ops << endl;
+    cout << "Gflops: " << count_ops/((fill_time+solve_time)*1000000000) << endl;
 
 
     if(print) {
