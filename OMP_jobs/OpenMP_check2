@@ -1,0 +1,5 @@
+#BSUB -o result.out #BSUB -W 0:10 #BSUB -m polus-c4-ib #BSUB -x
+#BSUB -J "OpenMP_job"
+#BSUB -R affinity[core(16):distribute=pack(socket=1)] 
+OMP_NUM_THREADS=16
+/polusfs/lsf/openmp/launchOpenMP.py ./solver 10000 1000 2 1 16

@@ -1,0 +1,4 @@
+#BSUB -W 00:15
+#BSUB -o "my_job.%J.out"
+#BSUB -R "affinity[core(20)]"
+OMP_NUM_THREADS=4 ./solver 10000 1000 2 1 4
